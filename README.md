@@ -95,13 +95,3 @@ Uygulamayı çalıştırmadan önce `src/algo.py` (veya ana betik dosyanızın a
     * Bir pencere açılarak kamera görüntüsü gösterilecektir.
     * Kamera karşısına geçtiğinizde, yüzünüzün etrafında bir kutu ve tanınan kişinin adı (veya "Unknown") ile benzerlik skoru görüntülenecektir.
     * Uygulamadan çıkmak için kamera penceresi aktifken klavyeden `q` tuşuna basın.
-
-## 📄 `.gitignore` Dosyası Açıklaması
-
-Projenizdeki `.gitignore` dosyası, Git versiyon kontrol sisteminin hangi dosya ve klasörleri takip etmemesi gerektiğini belirtir. Bu, gereksiz dosyaların veya hassas bilgilerin depoya (repository) gönderilmesini engeller.
-
-Mevcut `.gitignore` içeriğiniz:
-/cuda-keyring_1.1-1_all.deb/cudnn-local-repo-ubuntu2204-8.9.7.29_1.0-1_amd64.deb/venv
-* **/cuda-keyring_1.1-1_all.deb**: NVIDIA CUDA deposu için anahtar dosyasının indirilmiş bir kopyası. Bu, her geliştiricinin kendi sistemine kurması gereken bir dosyadır ve projeyle birlikte dağıtılmasına gerek yoktur.
-* **/cudnn-local-repo-ubuntu2204-8.9.7.29_1.0-1_amd64.deb**: NVIDIA cuDNN yerel depo dosyasının indirilmiş bir kopyası. Benzer şekilde, bu da sisteme özgü bir kurulum dosyasıdır.
-* **/venv**: Python sanal ortam klasörü. Bu klasör, projeye özgü Python yorumlayıcısını ve kurulan tüm kütüphaneleri içerir. Boyutu büyük olabilir ve içeriği `pip install -r requirements.txt` (eğer bir `requirements.txt` dosyanız varsa) komutuyla her sistemde yeniden oluşturulabilir. Bu nedenle, sanal ortam klasörleri genellikle `.gitignore` dosyasına eklenir.
