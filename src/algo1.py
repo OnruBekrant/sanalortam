@@ -67,7 +67,7 @@ def load_gallery_embeddings(app, gallery_path):
     else:
         embeddings = np.zeros((0, 512)) # Embedding boyutu (genellikle 512)
         print("Uyarı: Galeriden hiç yüz yüklenemedi.")
-    return names, gallery_embeddings
+    return names, embeddings
 
 # =====================
 # Ana Uygulama
