@@ -20,10 +20,11 @@ THRESHOLD = 0.5 # Yüz tanıma için benzerlik eşiği
 # Telefonunuzdaki IP kamera uygulamasından aldığınız URL için:
 # CAMERA_ID = "http://<telefonunuzun_ip_adresi>:<port>/video" # Örnek MJPEG URL
 # CAMERA_ID = "rtsp://<telefonunuzun_ip_adresi>:<port>/..." # Örnek RTSP URL
-CAMERA_ID = 0 # Varsayılan olarak dahili kamera
+#CAMERA_ID = 0 # Varsayılan olarak dahili kamera
 # Örnek IP Kamera URL'leri (kendi telefonunuzdan aldığınızla değiştirin):
-# CAMERA_ID = "http://192.168.1.100:8080/video"
-# CAMERA_ID = "https://192.168.122.106/video" # Bu HTTPS ise OpenCV'nin SSL ile derlenmiş olması gerekebilir.
+#CAMERA_ID = "https://10.80.3.211:8080/video"
+#CAMERA_ID = "https://192.168.122.33:8080/video" # Bu HTTPS ise OpenCV'nin SSL ile derlenmiş olması gerekebilir.
+CAMERA_ID = "https://10.70.56.88:8080/video"
 
 WINDOW_NAME = "FaceRec"
 
