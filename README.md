@@ -82,7 +82,7 @@ Uygulamayı çalıştırmadan önce `src/algo.py` (veya ana betik dosyanızın a
 ## 🚀 Kullanım
 
 1.  Yukarıdaki kurulum ve yapılandırma adımlarını tamamladığınızdan emin olun.
-2.  Sanal ortamınızın (`venv`) aktif olduğundan emin olun.
+2.  Sanal ortamınızın (`venv`) aktif olduğundan emin olun.(source venv/bin/activate)
 3.  Proje ana dizinindeyken aşağıdaki komutla uygulamayı çalıştırın:
     ```bash
     python3 src/algo.py
