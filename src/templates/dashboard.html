@@ -10,21 +10,24 @@
         h2 { color: #333; margin-bottom: 20px; }
         p { font-size: 1.1em; margin-bottom: 15px; }
         .balance-info { font-size: 1.3em; font-weight: bold; color: #28a745; margin-bottom: 30px; }
-        .actions a {
+        .actions a, .admin-actions a { /* .admin-actions a eklendi */
             display: inline-block;
             text-decoration: none;
             color: white;
             padding: 12px 20px;
-            margin: 10px 5px; /* Butonlar arası boşluk için ayarlandı */
+            margin: 10px 5px; 
             border-radius: 5px;
             font-size: 1em;
             transition: background-color 0.3s ease;
-            min-width: 180px; /* Butonların benzer genişlikte olması için */
+            min-width: 180px; 
         }
         .actions a.payment-link { background-color: #007bff; }
         .actions a.payment-link:hover { background-color: #0056b3; }
         .actions a.add-balance-link { background-color: #5cb85c; }
         .actions a.add-balance-link:hover { background-color: #4cae4c; }
+        .admin-actions { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;} /* Admin linki için stil */
+        .admin-actions a { background-color: #6c757d; } /* Admin linki rengi */
+        .admin-actions a:hover { background-color: #5a6268; }
         .logout-link { margin-top: 30px; }
         .logout-link a { color: #d9534f; text-decoration: none; font-weight: bold; }
         .logout-link a:hover { text-decoration: underline; }
@@ -54,6 +57,14 @@
             <a href="{{ url_for('make_payment_page') }}" class="payment-link">Yüz Tanıma ile Ödeme Yap</a>
             <a href="{{ url_for('add_balance_page') }}" class="add-balance-link">Bakiye Yükle</a>
         </div>
+
+        {# YENİ EKLENEN ADMIN LİNKİ KISMI #}
+        {% if is_admin %}
+        <div class="admin-actions">
+            <a href="{{ url_for('admin_dashboard') }}">Admin Paneli</a>
+        </div>
+        {% endif %}
+        {# ADMIN LİNKİ KISMI SONU #}
 
         <p class="logout-link"><a href="{{ url_for('logout') }}">Çıkış Yap</a></p>
     </div>

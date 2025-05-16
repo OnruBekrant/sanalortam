@@ -2,19 +2,19 @@
 import os
 import base64
 import uuid
-from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, Response
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, Response, abort
 import json
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from decimal import Decimal, InvalidOperation # Bakiye işlemleri için Decimal kullanımı
+from decimal import Decimal, InvalidOperation
+from functools import wraps
 
 import cv2
 import numpy as np
 from insightface.app import FaceAnalysis
 from sklearn.metrics.pairwise import cosine_similarity
-# import platform as pf # Şu anda kullanılmıyor
 
 # Path Tanımlamaları
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -30,7 +30,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = '51614224ab65a418b29e41a41564562fd059d0b27af0e080'
 app.config['USER_FACE_RECOGNITION_THRESHOLD'] = 0.5
 app.config['JSON_AS_ASCII'] = False
-app.config['FACE_RECOGNITION_FEE'] = Decimal('1.50') # Yüz tanıma ücreti (örneğin 1.50 birim)
+app.config['FACE_RECOGNITION_FEE'] = Decimal('1.50')
+# app.config['ADMIN_EMAIL'] = 'cerimgt@gmail.com' # BU SATIRI ARTIK KULLANMAYACAĞIZ, YORUM SATIRI YAPABİLİR VEYA SİLEBİLİRSİNİZ
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -62,7 +63,8 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     photo_filename = db.Column(db.String(255), nullable=True)
     embedding = db.Column(db.LargeBinary, nullable=True)
-    balance = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00')) # YENİ: Kullanıcı bakiyesi
+    balance = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00'))
+    is_admin = db.Column(db.Boolean, nullable=False, default=False) # YENİ: Admin durumu için alan
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -76,11 +78,23 @@ def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 def create_json_response(data, status_code=200):
-    json_data = json.dumps(data, ensure_ascii=False, default=str) # Decimal için default=str eklendi
+    json_data = json.dumps(data, ensure_ascii=False, default=str)
     return Response(json_data, status=status_code, content_type='application/json; charset=utf-8')
 
+# --- Admin Sayfaları İçin Güncellenmiş Decorator ---
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Kullanıcının giriş yapmış olması ve User modelindeki is_admin alanının True olması gerekir
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash("Bu sayfaya erişim yetkiniz yok.", "danger")
+            return redirect(url_for('go_to_dashboard_or_login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- Rotalar (Routes) ---
 @app.route('/')
-def go_to_dashboard_or_login(): # Fonksiyon adı daha açıklayıcı hale getirildi
+def go_to_dashboard_or_login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
@@ -131,9 +145,13 @@ def register():
             elif photo_data_url:
                 flash('Gönderilen fotoğraf formatı uygun değil...', 'error')
                 return redirect(url_for('register'))
-            # Fotoğraf zorunlu değilse ve gönderilmediyse embedding None olacak
             
-            new_user = User(email=email, photo_filename=photo_saved_filename, embedding=user_embedding_bytes, balance=Decimal('10.00')) # Yeni kullanıcıya 10 birim bakiye
+            # Yeni kullanıcılar varsayılan olarak admin değildir (is_admin=False)
+            new_user = User(email=email, 
+                            photo_filename=photo_saved_filename, 
+                            embedding=user_embedding_bytes, 
+                            balance=Decimal('10.00')) 
+                            # is_admin alanı default=False olduğu için ayrıca belirtmeye gerek yok
             new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
@@ -176,9 +194,12 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', user_email=current_user.email, current_balance=current_user.balance)
+    # is_admin değişkeni artık doğrudan current_user.is_admin ile alınacak
+    return render_template('dashboard.html', 
+                           user_email=current_user.email, 
+                           current_balance=current_user.balance, 
+                           is_admin=current_user.is_admin) # Güncellendi
 
-# --- YENİ API ENDPOINT'LERİ ---
 @app.route('/get_balance', methods=['GET'])
 @login_required
 def get_balance():
@@ -187,7 +208,7 @@ def get_balance():
 @app.route('/add_balance_page', methods=['GET'])
 @login_required
 def add_balance_page():
-    return render_template('add_balance.html') # Bu HTML dosyasını oluşturacağız
+    return render_template('add_balance.html')
 
 @app.route('/process_add_balance', methods=['POST'])
 @login_required
@@ -197,12 +218,10 @@ def process_add_balance():
         if not amount_str:
             flash('Lütfen bir miktar girin.', 'error')
             return redirect(url_for('add_balance_page'))
-        
         amount = Decimal(amount_str)
         if amount <= 0:
             flash('Lütfen pozitif bir miktar girin.', 'error')
             return redirect(url_for('add_balance_page'))
-
         current_user.balance += amount
         db.session.commit()
         flash(f'{amount} birim başarıyla hesabınıza eklendi. Yeni bakiyeniz: {current_user.balance}', 'success')
@@ -219,82 +238,63 @@ def process_add_balance():
 @app.route('/make_payment_page', methods=['GET'])
 @login_required
 def make_payment_page():
-    return render_template('make_payment.html', fee=app.config['FACE_RECOGNITION_FEE']) # Bu HTML dosyasını oluşturacağız
+    return render_template('make_payment.html', fee=app.config['FACE_RECOGNITION_FEE'])
 
 @app.route('/process_payment_with_face', methods=['POST'])
-@login_required # Bu endpoint'i artık korumalı yapıyoruz
+@login_required
 def process_payment_with_face():
     if not face_analyzer_app:
         return create_json_response({'error': 'Yüz tanıma servisi aktif değil.', 'status': 'error'}, 503)
-    
     data = request.get_json()
     if not data or 'image_data_url' not in data:
         return create_json_response({'error': 'Resim verisi (image_data_url) eksik.', 'status': 'error'}, 400)
-    
     image_data_url = data['image_data_url']
     if not image_data_url.startswith('data:image/jpeg;base64,'):
         return create_json_response({'error': 'Geçersiz resim formatı.', 'status': 'error'}, 400)
-
     try:
         base64_image_data = image_data_url.split(',')[1]
         image_data_bytes = base64.b64decode(base64_image_data)
         np_arr = np.frombuffer(image_data_bytes, np.uint8)
         img_frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
         if img_frame is None:
             return create_json_response({'error': 'Resim verisi çözümlenemedi.', 'status': 'error'}, 400)
-
         rgb_frame = cv2.cvtColor(img_frame, cv2.COLOR_BGR2RGB)
         detected_faces = face_analyzer_app.get(rgb_frame)
-
         if not detected_faces:
             return create_json_response({'name': 'Unknown', 'score': 0.0, 'message': 'Karede yüz bulunamadı.', 'status': 'no_face'})
-        
-        probe_face = detected_faces[0] # İlk tespit edilen yüzü al
+        probe_face = detected_faces[0]
         probe_embedding = probe_face.normed_embedding.reshape(1, -1)
-
-        # Karşılaştırılacak kullanıcı şu anki giriş yapmış kullanıcı olmalı
         user_to_verify = current_user 
         if not user_to_verify.embedding:
             return create_json_response({'name': 'Unknown', 'score': 0.0, 'message': 'Kullanıcının kayıtlı yüz özelliği bulunamadı.', 'status': 'no_embedding'})
-
         retrieved_embedding = np.frombuffer(user_to_verify.embedding, dtype=np.float32).reshape(1, -1)
-        
         similarity = cosine_similarity(probe_embedding, retrieved_embedding)[0][0]
         threshold = app.config.get('USER_FACE_RECOGNITION_THRESHOLD', 0.5)
         fee = app.config.get('FACE_RECOGNITION_FEE', Decimal('0.00'))
-
-        if similarity >= threshold: # Yüz tanındı (giriş yapmış kullanıcı ile eşleşti)
+        if similarity >= threshold:
             if user_to_verify.balance >= fee:
                 user_to_verify.balance -= fee
                 db.session.commit()
-                return create_json_response({
-                    'name': user_to_verify.email, 
-                    'score': float(similarity), 
-                    'message': f'Ödeme başarılı! {fee} birim düşüldü.',
-                    'new_balance': user_to_verify.balance,
-                    'status': 'payment_success'
-                })
+                return create_json_response({'name': user_to_verify.email, 'score': float(similarity), 'message': f'Ödeme başarılı! {fee} birim düşüldü.','new_balance': user_to_verify.balance,'status': 'payment_success'})
             else:
-                return create_json_response({
-                    'name': user_to_verify.email, 
-                    'score': float(similarity), 
-                    'message': 'Yüz tanındı ancak bakiye yetersiz.',
-                    'current_balance': user_to_verify.balance,
-                    'status': 'insufficient_balance'
-                })
-        else: # Yüz tanınamadı (giriş yapmış kullanıcı ile eşleşmedi)
-            return create_json_response({
-                'name': 'Unknown', 
-                'score': float(similarity), 
-                'message': 'Yüz tanınamadı (kullanıcıyla eşleşmedi).',
-                'status': 'recognition_failed'
-            })
-
+                return create_json_response({'name': user_to_verify.email, 'score': float(similarity), 'message': 'Yüz tanındı ancak bakiye yetersiz.','current_balance': user_to_verify.balance,'status': 'insufficient_balance'})
+        else:
+            return create_json_response({'name': 'Unknown', 'score': float(similarity), 'message': 'Yüz tanınamadı (kullanıcıyla eşleşmedi).','status': 'recognition_failed'})
     except Exception as e:
         app.logger.error(f"Yüz tanıma ile ödeme hatası: {e}", exc_info=True)
         return create_json_response({'error': f'Ödeme sırasında bir hata oluştu: {str(e)}', 'status': 'error'}, 500)
 
+@app.route('/test_turkce_json')
+def test_turkce_json():
+    print(f"DEBUG: test_turkce_json içinde JSON_AS_ASCII ayarı (config'den): {app.config.get('JSON_AS_ASCII')}")
+    data = {"mesaj": "Başarı! Şemsi Paşa pasajında sesi büzüşesiceler."}
+    return create_json_response(data)
+
+@app.route('/admin')
+@login_required
+@admin_required 
+def admin_dashboard():
+    return "Admin Paneline Hoşgeldiniz!" # Şimdilik basit bir mesaj
 
 if __name__ == '__main__':
     if not os.path.exists(INSTANCE_FOLDER_PATH):
