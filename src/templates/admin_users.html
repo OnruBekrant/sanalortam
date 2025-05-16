@@ -3,26 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Kullanıcıları Yönet</title>
+    <title>{{ page_title }} - Yüz Tanıma Admin</title>
     <style>
-        body { font-family: sans-serif; margin: 0; background-color: #f8f9fa; color: #343a40; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; background-color: #f8f9fa; color: #212529; line-height: 1.6; }
         .admin-container { display: flex; min-height: 100vh; }
-        .sidebar { width: 250px; background-color: #343a40; color: #fff; padding: 20px; }
-        .sidebar h3 { text-align: center; margin-bottom: 30px; }
-        .sidebar ul { list-style-type: none; padding: 0; }
-        .sidebar ul li a { color: #adb5bd; text-decoration: none; display: block; padding: 10px 15px; border-radius: 4px; margin-bottom: 5px; }
-        .sidebar ul li a:hover, .sidebar ul li a.active { background-color: #495057; color: #fff; }
-        .content { flex-grow: 1; padding: 30px; }
-        .content h2 { margin-bottom: 25px; color: #343a40; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
-        th { background-color: #e9ecef; font-weight: bold; }
-        tr:nth-child(even) { background-color: #f8f9fa; }
-        tr:hover { background-color: #e2e6ea; }
-        .action-links a { margin-right: 10px; text-decoration: none; color: #007bff; }
+        .sidebar { 
+            width: 260px; 
+            background-color: #343a40; 
+            color: #fff; 
+            padding: 25px 15px; 
+            box-shadow: 2px 0 8px rgba(0,0,0,0.15); 
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar h3 { 
+            text-align: center; 
+            margin-top: 0;
+            margin-bottom: 30px; 
+            font-size: 1.6em; 
+            border-bottom: 1px solid #495057; 
+            padding-bottom: 20px;
+            color: #fff;
+        }
+        .sidebar ul { 
+            list-style-type: none; 
+            padding: 0; 
+            margin: 0;
+            flex-grow: 1; 
+        }
+        .sidebar ul li a { 
+            color: #ced4da; 
+            text-decoration: none; 
+            display: block; 
+            padding: 12px 20px; 
+            border-radius: 5px; 
+            margin-bottom: 8px; 
+            transition: background-color 0.2s ease, color 0.2s ease;
+            font-size: 0.95em;
+        }
+        .sidebar ul li a:hover { 
+            background-color: #495057; 
+            color: #fff; 
+        }
+        .sidebar ul li a.active { 
+            background-color: #007bff; 
+            color: #fff; 
+            font-weight: bold;
+        }
+        .sidebar .footer-links { margin-top: auto; }
+        .sidebar .footer-links hr { border-color: #495057; margin: 20px 0; }
+
+        .content { 
+            flex-grow: 1; 
+            padding: 30px 40px; 
+            overflow-y: auto; 
+        }
+        .content h2 { 
+            margin-top: 0;
+            margin-bottom: 30px; 
+            color: #343a40; 
+            font-size: 2em; 
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 15px;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-bottom: 25px; /* Artırıldı */
+            background-color: #fff; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Güncellendi */
+            border-radius: 8px; /* Tabloya border radius */
+            overflow: hidden; /* Radius'un içindeki borderları düzgün göstermesi için */
+        }
+        th, td { 
+            border-bottom: 1px solid #dee2e6; /* Sadece alt border */
+            padding: 15px; /* Padding artırıldı */
+            text-align: left; 
+            font-size: 0.9em;
+        }
+        th { 
+            background-color: #e9ecef; 
+            font-weight: 600; /* Daha belirgin başlık */
+            color: #495057;
+            text-transform: uppercase; /* Başlıkları büyük harf */
+            letter-spacing: 0.5px;
+        }
+        /* tr:nth-child(even) { background-color: #f8f9fa; } */ /* Kaldırıldı, daha sade bir görünüm */
+        tr:hover { background-color: #f1f3f5; } /* Hover efekti güncellendi */
+        td:first-child, th:first-child { padding-left: 20px; } /* İlk sütun için padding */
+        td:last-child, th:last-child { padding-right: 20px; } /* Son sütun için padding */
+
+        .action-links a { margin-right: 12px; text-decoration: none; color: #007bff; font-weight: 500; }
         .action-links a.delete { color: #dc3545; }
         .action-links a:hover { text-decoration: underline; }
-        .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; }
+
+        .pagination { margin-top: 30px; text-align: center; }
+        .pagination a, .pagination span {
+            margin: 0 5px;
+            padding: 8px 12px;
+            text-decoration: none;
+            border: 1px solid #dee2e6;
+            color: #007bff;
+            border-radius: 4px;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .pagination a:hover { background-color: #e9ecef; }
+        .pagination .current {
+            font-weight: bold;
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .pagination .disabled {
+            color: #6c757d;
+            pointer-events: none;
+            border-color: #dee2e6;
+        }
+        .message { padding: 12px 15px; margin-bottom: 20px; border-radius: 5px; text-align: center; font-size: 0.95em; }
         .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .message.danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
@@ -30,17 +127,24 @@
 <body>
     <div class="admin-container">
         <nav class="sidebar">
-            <h3>Admin Paneli</h3>
-            <ul>
-                <li><a href="{{ url_for('admin_dashboard') }}">Ana Sayfa</a></li>
-                <li><a href="{{ url_for('admin_list_users') }}" class="active">Kullanıcıları Yönet</a></li>
-                {# İleride eklenecek diğer admin linkleri buraya gelebilir #}
-                <li><a href="{{ url_for('dashboard') }}">Kullanıcı Paneline Dön</a></li>
-                <li><a href="{{ url_for('logout') }}">Çıkış Yap</a></li>
-            </ul>
+            <div>
+                <h3>Admin Paneli</h3>
+                <ul>
+                    <li><a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint == 'admin_dashboard' else '' }}">Ana Sayfa</a></li>
+                    <li><a href="{{ url_for('admin_list_users') }}" class="{{ 'active' if request.endpoint == 'admin_list_users' else '' }}">Kullanıcıları Yönet</a></li>
+                    {# <li><a href="#">Ayarlar</a></li> #}
+                </ul>
+            </div>
+            <div class="footer-links">
+                <hr>
+                <ul>
+                    <li><a href="{{ url_for('dashboard') }}">Kullanıcı Paneline Dön</a></li>
+                    <li><a href="{{ url_for('logout') }}">Çıkış Yap</a></li>
+                </ul>
+            </div>
         </nav>
         <main class="content">
-            <h2>Kullanıcı Listesi</h2>
+            <h2>{{ page_title }}</h2>
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -78,11 +182,44 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="text-align:center;">Kayıtlı kullanıcı bulunamadı.</td>
+                        <td colspan="7" style="text-align:center; padding: 20px;">Kayıtlı kullanıcı bulunamadı.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+
+            {# Sayfalama Linkleri #}
+            {% if pagination %}
+            <div class="pagination">
+                {# Önceki Sayfa Linki #}
+                {% if pagination.has_prev %}
+                    <a href="{{ url_for(request.endpoint, page=pagination.prev_num) }}">&laquo; Önceki</a>
+                {% else %}
+                    <span class="disabled">&laquo; Önceki</span>
+                {% endif %}
+
+                {# Sayfa Numaraları #}
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        {% if pagination.page == page_num %}
+                            <span class="current">{{ page_num }}</span>
+                        {% else %}
+                            <a href="{{ url_for(request.endpoint, page=page_num) }}">{{ page_num }}</a>
+                        {% endif %}
+                    {% else %}
+                        <span class="disabled">...</span>
+                    {% endif %}
+                {% endfor %}
+
+                {# Sonraki Sayfa Linki #}
+                {% if pagination.has_next %}
+                    <a href="{{ url_for(request.endpoint, page=pagination.next_num) }}">Sonraki &raquo;</a>
+                {% else %}
+                    <span class="disabled">Sonraki &raquo;</span>
+                {% endif %}
+            </div>
+            {% endif %}
+
         </main>
     </div>
 </body>
