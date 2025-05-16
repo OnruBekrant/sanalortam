@@ -60,41 +60,70 @@
         }
         .content h2 { 
             margin-top: 0;
-            margin-bottom: 30px; 
+            margin-bottom: 20px; 
             color: #343a40; 
             font-size: 2em; 
             border-bottom: 1px solid #dee2e6;
             padding-bottom: 15px;
         }
+        .search-form { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; }
+        .search-form input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 1em; }
+        .search-form button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; height: 40px; }
+        .search-form button:hover { background-color: #0056b3; }
+        .search-form a { 
+            margin-left: 10px;
+            color: #6c757d;
+            text-decoration: none;
+            font-size: 0.9em;
+        }
+        .search-form a:hover { text-decoration: underline;}
+
         table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-bottom: 25px; /* Artırıldı */
+            margin-bottom: 25px; 
             background-color: #fff; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Güncellendi */
-            border-radius: 8px; /* Tabloya border radius */
-            overflow: hidden; /* Radius'un içindeki borderları düzgün göstermesi için */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+            border-radius: 8px; 
+            overflow: hidden; 
         }
         th, td { 
-            border-bottom: 1px solid #dee2e6; /* Sadece alt border */
-            padding: 15px; /* Padding artırıldı */
+            border-bottom: 1px solid #dee2e6; 
+            padding: 12px 15px; 
             text-align: left; 
             font-size: 0.9em;
+            vertical-align: middle;
         }
         th { 
             background-color: #e9ecef; 
-            font-weight: 600; /* Daha belirgin başlık */
+            font-weight: 600; 
             color: #495057;
-            text-transform: uppercase; /* Başlıkları büyük harf */
+            text-transform: uppercase; 
             letter-spacing: 0.5px;
+            padding-top: 15px; 
+            padding-bottom: 15px;
         }
-        /* tr:nth-child(even) { background-color: #f8f9fa; } */ /* Kaldırıldı, daha sade bir görünüm */
-        tr:hover { background-color: #f1f3f5; } /* Hover efekti güncellendi */
-        td:first-child, th:first-child { padding-left: 20px; } /* İlk sütun için padding */
-        td:last-child, th:last-child { padding-right: 20px; } /* Son sütun için padding */
+        tr:hover { background-color: #f1f3f5; } 
+        td:first-child, th:first-child { padding-left: 20px; } 
+        td:last-child, th:last-child { padding-right: 20px; } 
 
-        .action-links a { margin-right: 12px; text-decoration: none; color: #007bff; font-weight: 500; }
-        .action-links a.delete { color: #dc3545; }
+        .action-links a, .action-links button { 
+            margin-right: 12px; 
+            text-decoration: none; 
+            font-weight: 500;
+            padding: 5px 8px; 
+            border-radius: 4px; 
+            font-size: 0.9em; 
+            cursor: pointer;
+            vertical-align: middle; 
+        }
+        .action-links a { color: #007bff; border: 1px solid transparent; }
+        .action-links button.delete-btn { 
+            color: #fff; 
+            background-color: #dc3545;
+            border: 1px solid #dc3545;
+        }
+        .action-links button.delete-btn:hover { background-color: #c82333; border-color: #bd2130;}
         .action-links a:hover { text-decoration: underline; }
 
         .pagination { margin-top: 30px; text-align: center; }
@@ -131,8 +160,8 @@
                 <h3>Admin Paneli</h3>
                 <ul>
                     <li><a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint == 'admin_dashboard' else '' }}">Ana Sayfa</a></li>
-                    <li><a href="{{ url_for('admin_list_users') }}" class="{{ 'active' if request.endpoint == 'admin_list_users' else '' }}">Kullanıcıları Yönet</a></li>
-                    {# <li><a href="#">Ayarlar</a></li> #}
+                    <li><a href="{{ url_for('admin_list_users') }}" class="{{ 'active' if 'user' in request.endpoint or request.endpoint == 'admin_list_users' else '' }}">Kullanıcıları Yönet</a></li>
+                    <li><a href="{{ url_for('admin_settings') }}" class="{{ 'active' if request.endpoint == 'admin_settings' else '' }}">Sistem Ayarları</a></li>
                 </ul>
             </div>
             <div class="footer-links">
@@ -154,6 +183,14 @@
                 {% endif %}
             {% endwith %}
 
+            <form method="GET" action="{{ url_for('admin_list_users') }}" class="search-form">
+                <input type="text" name="q" placeholder="E-posta ile ara..." value="{{ search_query or '' }}">
+                <button type="submit">Ara</button>
+                {% if search_query %}
+                    <a href="{{ url_for('admin_list_users') }}">Aramayı Temizle</a>
+                {% endif %}
+            </form>
+
             <table>
                 <thead>
                     <tr>
@@ -161,65 +198,72 @@
                         <th>E-posta</th>
                         <th>Bakiye</th>
                         <th>Admin mi?</th>
-                        <th>Fotoğraf Dosyası</th>
-                        <th>Embedding Var mı?</th>
+                        <th>Fotoğraf</th>
+                        <th>Embedding?</th>
                         <th>İşlemler</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for user in users %}
+                    {% for user_item in users %}
                     <tr>
-                        <td>{{ user.id }}</td>
-                        <td>{{ user.email }}</td>
-                        <td>{{ "%.2f"|format(user.balance) }}</td>
-                        <td>{% if user.is_admin %}Evet{% else %}Hayır{% endif %}</td>
-                        <td>{{ user.photo_filename if user.photo_filename else '-' }}</td>
-                        <td>{% if user.embedding %}Var{% else %}Yok{% endif %}</td>
+                        <td>{{ user_item.id }}</td>
+                        <td>{{ user_item.email }}</td>
+                        <td>{{ "%.2f"|format(user_item.balance) }}</td>
+                        <td>{% if user_item.is_admin %}Evet{% else %}Hayır{% endif %}</td>
+                        <td>
+                            {% if user_item.photo_filename %}
+                                <img src="{{ url_for('serve_user_photo', filename=user_item.photo_filename) }}" alt="Foto" style="width: 50px; height: auto; border-radius: 4px;">
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{% if user_item.embedding %}Var{% else %}Yok{% endif %}</td>
                         <td class="action-links">
-                            <a href="#">Düzenle</a> {# İleride eklenecek #}
-                            <a href="#" class="delete">Sil</a> {# İleride eklenecek #}
+                            <a href="{{ url_for('admin_edit_user', user_id=user_item.id) }}">Düzenle</a> 
+                            <form method="POST" action="{{ url_for('admin_delete_user', user_id=user_item.id) }}" style="display: inline;" onsubmit="return confirm('Bu kullanıcıyı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.');">
+                                <button type="submit" class="delete-btn">Sil</button>
+                            </form>
                         </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="text-align:center; padding: 20px;">Kayıtlı kullanıcı bulunamadı.</td>
+                        <td colspan="7" style="text-align:center; padding: 20px;">
+                            {% if search_query %}
+                                '{{ search_query }}' için sonuç bulunamadı.
+                            {% else %}
+                                Kayıtlı kullanıcı bulunamadı.
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
 
-            {# Sayfalama Linkleri #}
             {% if pagination %}
             <div class="pagination">
-                {# Önceki Sayfa Linki #}
                 {% if pagination.has_prev %}
-                    <a href="{{ url_for(request.endpoint, page=pagination.prev_num) }}">&laquo; Önceki</a>
+                    <a href="{{ url_for(request.endpoint, page=pagination.prev_num, q=search_query or '') }}">&laquo; Önceki</a>
                 {% else %}
                     <span class="disabled">&laquo; Önceki</span>
                 {% endif %}
-
-                {# Sayfa Numaraları #}
                 {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                     {% if page_num %}
                         {% if pagination.page == page_num %}
                             <span class="current">{{ page_num }}</span>
                         {% else %}
-                            <a href="{{ url_for(request.endpoint, page=page_num) }}">{{ page_num }}</a>
+                            <a href="{{ url_for(request.endpoint, page=page_num, q=search_query or '') }}">{{ page_num }}</a>
                         {% endif %}
                     {% else %}
                         <span class="disabled">...</span>
                     {% endif %}
                 {% endfor %}
-
-                {# Sonraki Sayfa Linki #}
                 {% if pagination.has_next %}
-                    <a href="{{ url_for(request.endpoint, page=pagination.next_num) }}">Sonraki &raquo;</a>
+                    <a href="{{ url_for(request.endpoint, page=pagination.next_num, q=search_query or '') }}">Sonraki &raquo;</a>
                 {% else %}
                     <span class="disabled">Sonraki &raquo;</span>
                 {% endif %}
             </div>
             {% endif %}
-
         </main>
     </div>
 </body>

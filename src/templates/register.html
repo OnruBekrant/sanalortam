@@ -5,41 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kayıt Ol</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
-        h2 { text-align: center; color: #333; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; }
-        input[type="email"], input[type="password"] { width: calc(100% - 22px); padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; }
-        input[type="submit"], button#captureButton, button#retakeButton { /* Güncellendi */
-            color: white; padding: 10px 15px; border: none; border-radius: 4px; 
-            cursor: pointer; font-size: 16px; width: 100%; margin-bottom:10px; 
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; display: flex; justify-content: center; align-items: center; min-height: 90vh; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; margin: auto; }
+        h2 { text-align: center; color: #333; margin-bottom: 25px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #495057; }
+        input[type="email"], 
+        input[type="password"] { 
+            width: 100%; 
+            padding: 12px; 
+            margin-bottom: 20px; 
+            border: 1px solid #ced4da; 
+            border-radius: 4px; 
+            box-sizing: border-box;
+            font-size: 1em;
         }
-        input[type="submit"] { background-color: #5cb85c; }
-        input[type="submit"]:hover { background-color: #4cae4c; }
-        button#captureButton { background-color: #007bff; } /* Mavi buton */
+        input[type="submit"], 
+        button#captureButton, 
+        button#retakeButton { 
+            color: white; 
+            padding: 12px 20px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 1.05em; 
+            width: 100%; 
+            margin-bottom:15px; 
+            transition: background-color 0.2s ease;
+        }
+        input[type="submit"] { background-color: #28a745; } /* Yeşil Kayıt Ol butonu */
+        input[type="submit"]:hover { background-color: #218838; }
+        button#captureButton { background-color: #007bff; } /* Mavi Fotoğraf Çek butonu */
         button#captureButton:hover { background-color: #0056b3; }
-        button#retakeButton { background-color: #ffc107; color: #212529; } /* Sarı buton */
+        button#retakeButton { background-color: #ffc107; color: #212529; } /* Sarı Yeniden Çek butonu */
         button#retakeButton:hover { background-color: #e0a800; }
 
-
-        .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; }
-        .message.success { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; }
-        .message.error { background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; }
-        .login-link { text-align: center; margin-top: 15px; }
+        .message { padding: 10px 15px; margin-bottom: 20px; border-radius: 4px; text-align: center; font-size: 0.95em;}
+        .message.success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .message.warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+        
+        .login-link { text-align: center; margin-top: 20px; }
         .login-link a { color: #007bff; text-decoration: none; }
         .login-link a:hover { text-decoration: underline; }
         
-        #cameraContainer { display: flex; flex-direction: column; align-items: center; margin-bottom: 15px; }
+        #cameraContainer { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; border: 1px solid #eee; padding:15px; background-color: #f9f9f9; border-radius: 5px;}
         video#videoElement { 
             border: 1px solid #ddd; 
             border-radius: 4px; 
             transform: scaleX(-1); /* Kamerayı aynala */
+            background-color: #333; /* Video yüklenene kadar */
+            margin-bottom: 10px;
         }
         canvas#canvasElement { 
-            border: 1px solid #007bff; /* Çekilen fotoğrafı belirtmek için farklı border */
+            border: 1px solid #007bff; 
             border-radius: 4px; 
             display: none; /* Başlangıçta gizli */
-            transform: scaleX(-1); /* Canvas'ı da aynala ki görüntü tutarlı olsun */
+            transform: scaleX(-1); /* Canvas'ı da aynala */
+            margin-bottom: 10px;
         }
         #captureStatus { font-style: italic; color: #555; text-align: center; margin-top: 5px; min-height: 1.2em; }
     </style>
@@ -56,7 +78,8 @@
         {% endwith %}
 
         <div id="cameraContainer">
-            <video id="videoElement" width="320" height="240" autoplay playsinline></video>
+            <video id="videoElement" width="320" height="240" autoplay playsinline muted></video> 
+            {# muted eklendi, bazı tarayıcılar autoplay için isteyebilir #}
             <canvas id="canvasElement" width="320" height="240"></canvas>
             <button type="button" id="captureButton">Fotoğraf Çek</button>
             <button type="button" id="retakeButton" style="display:none;">Yeniden Çek</button>
@@ -64,11 +87,11 @@
         </div>
 
         <form method="POST" action="{{ url_for('register') }}" id="registrationForm">
-            <div>
+            <div class="form-group">
                 <label for="email">E-posta:</label>
                 <input type="email" id="email" name="email" required>
             </div>
-            <div>
+            <div class="form-group">
                 <label for="password">Şifre:</label>
                 <input type="password" id="password" name="password" required>
             </div>
@@ -89,26 +112,31 @@
         const retakeButton = document.getElementById('retakeButton');
         const photoDataUrlInput = document.getElementById('photo_data_url');
         const captureStatus = document.getElementById('captureStatus');
-        const submitButton = document.getElementById('submitButton');
-
-        let stream = null; // Aktif kamera akışını saklamak için
+        const registrationForm = document.getElementById('registrationForm');
+        let stream = null;
 
         async function startCamera() {
             try {
-                if (stream) { // Eğer zaten bir stream varsa, önce onu durdur (yeniden çekme durumu için)
+                if (stream) { 
                     stream.getTracks().forEach(track => track.stop());
                 }
+                // Kullanıcıdan kamera izni iste
                 stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                 video.srcObject = stream;
-                video.style.display = 'block';    // Video elementini göster
-                canvas.style.display = 'none';    // Canvas'ı gizle
-                captureButton.style.display = 'inline-block'; // Fotoğraf Çek butonunu göster
-                retakeButton.style.display = 'none'; // Yeniden Çek butonunu gizle
+                video.style.display = 'block';    
+                canvas.style.display = 'none';    
+                captureButton.style.display = 'inline-block'; 
+                retakeButton.style.display = 'none'; 
                 captureStatus.textContent = 'Kamera aktif. Poz verin ve fotoğraf çekin.';
+                captureStatus.className = ''; // Mesaj stilini sıfırla
             } catch (err) {
                 console.error("Kamera başlatma hatası: ", err);
-                captureStatus.textContent = 'Kameraya erişilemedi! İzinleri kontrol edin.';
-                // Kullanıcıya daha belirgin bir uyarı verilebilir
+                captureStatus.textContent = 'Kameraya erişilemedi! Lütfen tarayıcı izinlerini kontrol edin ve sayfayı yenileyin.';
+                captureStatus.className = 'error'; // Hata mesajı stili
+                video.style.display = 'none'; // Hata durumunda video alanını gizle
+                canvas.style.display = 'none';
+                captureButton.style.display = 'inline-block'; // Kullanıcı tekrar denemek isteyebilir
+                retakeButton.style.display = 'none';
                 // alert("Kameraya erişilemedi. Lütfen tarayıcı izinlerini kontrol edin ve sayfayı yenileyin.");
             }
         }
@@ -116,49 +144,53 @@
         captureButton.addEventListener('click', () => {
             if (!stream || !stream.active) {
                 captureStatus.textContent = "Kamera aktif değil. Lütfen önce kamerayı başlatın/izin verin.";
-                startCamera(); // Kamerayı başlatmayı dene
+                captureStatus.className = 'warning';
+                startCamera(); 
                 return;
             }
             const context = canvas.getContext('2d');
-            // Video elementinin anlık görüntüsünü canvas'a çiz
-            // Video elementi CSS ile aynalandığı için, canvas'a çizilen görüntü de aynalı olacaktır.
-            // Eğer veritabanına veya işleme gönderilecek veri aynasız olmalıysa, 
-            // burada canvas'a çizerken geçici olarak transform'u tersine çevirmek gerekebilir
-            // veya sunucu tarafında bu düzeltme yapılabilir. Şimdilik kullanıcı ne görüyorsa onu yakalıyoruz.
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
             const dataUrl = canvas.toDataURL('image/jpeg');
-            photoDataUrlInput.value = dataUrl; // Fotoğraf verisini gizli alana ata
+            photoDataUrlInput.value = dataUrl; 
 
-            video.style.display = 'none';     // Video elementini gizle
-            canvas.style.display = 'block';   // Canvas'ı (çekilen fotoğrafı) göster
+            video.style.display = 'none';     
+            canvas.style.display = 'block';   
             
-            // Kamera akışını durdur
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
-                stream = null; // stream değişkenini temizle
+                stream = null; 
             }
 
             captureStatus.textContent = 'Fotoğraf çekildi. Kayıt olmak için formu doldurun.';
-            captureButton.style.display = 'none'; // Fotoğraf Çek butonunu gizle
-            retakeButton.style.display = 'inline-block'; // Yeniden Çek butonunu göster
+            captureStatus.className = 'success';
+            captureButton.style.display = 'none'; 
+            retakeButton.style.display = 'inline-block'; 
         });
 
         retakeButton.addEventListener('click', () => {
-            photoDataUrlInput.value = ''; // Önceki fotoğraf verisini temizle
-            startCamera(); // Kamerayı yeniden başlat
+            photoDataUrlInput.value = ''; 
+            startCamera(); 
         });
 
-        // Sayfa yüklendiğinde kamerayı otomatik olarak başlat
         window.addEventListener('load', startCamera);
 
-        // Form gönderilmeden önce fotoğrafın çekilmiş olmasını zorunlu kılmak isterseniz:
-        // document.getElementById('registrationForm').addEventListener('submit', function(event) {
-        //     if (!photoDataUrlInput.value) {
-        //         alert('Lütfen kayıt olmadan önce bir fotoğraf çekin.');
-        //         event.preventDefault(); // Formun gönderilmesini engelle
-        //     }
-        // });
+        registrationForm.addEventListener('submit', function(event) {
+            if (!photoDataUrlInput.value) {
+                // İsteğe bağlı: Fotoğraf çekilmemişse formu göndermeyi engelle
+                // flash('Lütfen kayıt olmadan önce bir fotoğraf çekin.', 'warning'); // Bu Flask flash'ı JS'de çalışmaz.
+                // Bunun yerine JS alert veya statusMessage kullanılabilir.
+                captureStatus.textContent = 'Lütfen kayıt olmadan önce bir fotoğraf çekin!';
+                captureStatus.className = 'error';
+                event.preventDefault(); 
+            }
+        });
+
+        // Sayfadan ayrılırken kamera akışını durdur
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
     </script>
 </body>
 </html>
