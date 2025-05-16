@@ -3,12 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Kullanıcı Paneli</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto; text-align: center; }
-        h2 { color: #333; }
-        p { font-size: 1.1em; }
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; display: flex; justify-content: center; align-items: center; min-height: 90vh; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; }
+        h2 { color: #333; margin-bottom: 20px; }
+        p { font-size: 1.1em; margin-bottom: 15px; }
+        .balance-info { font-size: 1.3em; font-weight: bold; color: #28a745; margin-bottom: 30px; }
+        .actions a {
+            display: inline-block;
+            text-decoration: none;
+            color: white;
+            padding: 12px 20px;
+            margin: 10px 5px; /* Butonlar arası boşluk için ayarlandı */
+            border-radius: 5px;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+            min-width: 180px; /* Butonların benzer genişlikte olması için */
+        }
+        .actions a.payment-link { background-color: #007bff; }
+        .actions a.payment-link:hover { background-color: #0056b3; }
+        .actions a.add-balance-link { background-color: #5cb85c; }
+        .actions a.add-balance-link:hover { background-color: #4cae4c; }
+        .logout-link { margin-top: 30px; }
         .logout-link a { color: #d9534f; text-decoration: none; font-weight: bold; }
         .logout-link a:hover { text-decoration: underline; }
         .message { padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; }
@@ -26,8 +43,18 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
+
         <p>Hoşgeldin, <strong>{{ user_email }}</strong>!</p>
-        <p>Bu senin kişisel dashboard sayfan.</p>
+        
+        <div class="balance-info">
+            Mevcut Bakiyeniz: {{ "%.2f"|format(current_balance) }} birim
+        </div>
+
+        <div class="actions">
+            <a href="{{ url_for('make_payment_page') }}" class="payment-link">Yüz Tanıma ile Ödeme Yap</a>
+            <a href="{{ url_for('add_balance_page') }}" class="add-balance-link">Bakiye Yükle</a>
+        </div>
+
         <p class="logout-link"><a href="{{ url_for('logout') }}">Çıkış Yap</a></p>
     </div>
 </body>

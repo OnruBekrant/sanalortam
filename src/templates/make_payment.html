@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yüz Tanıma ile Ödeme</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; display: flex; flex-direction: column; align-items: center; min-height: 90vh; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 550px; text-align: center; }
+        h2 { color: #333; margin-bottom: 15px; }
+        p { font-size: 1.1em; margin-bottom: 10px; }
+        #cameraContainer { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 5px; background-color: #f9f9f9;}
+        video#videoElement { 
+            border: 1px solid #ddd; 
+            border-radius: 4px; 
+            transform: scaleX(-1); /* Kamerayı aynala */
+            margin-bottom: 15px;
+            background-color: #333; 
+        }
+        canvas#canvasElement { display: none; } /* Sadece veri almak için, normalde görünmez */
+        
+        button#retryButton { 
+            background-color: #ffc107; 
+            color: #212529; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 1em; 
+            width: auto;
+            margin-top: 10px;
+            display: none; 
+        }
+        button#retryButton:hover { background-color: #e0a800; }
+        button#retryButton:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        #statusMessage { 
+            font-size: 1em; 
+            margin-top: 15px; 
+            padding: 10px;
+            border-radius: 4px;
+            min-height: 1.5em; 
+        }
+        #statusMessage.processing { color: #007bff; }
+        #statusMessage.success { color: #28a745; background-color: #d4edda; border: 1px solid #c3e6cb;}
+        #statusMessage.error { color: #dc3545; background-color: #f8d7da; border: 1px solid #f5c6cb;}
+        #statusMessage.warning { color: #ffc107; background-color: #fff3cd; border: 1px solid #ffeeba;}
+
+        .dashboard-link { text-align: center; margin-top: 25px; }
+        .dashboard-link a { color: #007bff; text-decoration: none; font-weight: bold; }
+        .dashboard-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Yüz Tanıma ile Ödeme</h2>
+        <p>Ödeme yapmak için lütfen kameraya net bir şekilde bakın.</p>
+        <p>İşlem Ücreti: <strong>{{ "%.2f"|format(fee) }} birim</strong></p>
+
+        <div id="cameraContainer">
+            <video id="videoElement" width="320" height="240" autoplay playsinline></video>
+            <canvas id="canvasElement" width="320" height="240"></canvas> 
+            <button type="button" id="retryButton">Yeniden Dene</button>
+            <div id="statusMessage">Kamera başlatılıyor ve yüzünüz aranıyor...</div>
+        </div>
+        
+        <div class="dashboard-link">
+            <p><a href="{{ url_for('dashboard') }}">Kullanıcı Paneline Geri Dön</a></p>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('videoElement');
+        const canvas = document.getElementById('canvasElement');
+        const retryButton = document.getElementById('retryButton');
+        const statusMessage = document.getElementById('statusMessage');
+        
+        let stream = null;
+        let recognitionInterval = null;
+        let attemptCount = 0;
+        const MAX_ATTEMPTS = 5; 
+        const ATTEMPT_INTERVAL_MS = 3000; 
+        const REDIRECT_DELAY_MS = 3000; // Başarılı ödeme sonrası yönlendirme için bekleme süresi
+
+        async function stopCameraStream() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                console.log("Kamera akışı durduruldu.");
+            }
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+                recognitionInterval = null;
+                console.log("Otomatik tanıma durduruldu.");
+            }
+        }
+
+        async function attemptRecognition() {
+            if (!stream || !stream.active) {
+                statusMessage.textContent = "Kamera aktif değil. Yeniden başlatılıyor...";
+                statusMessage.className = 'warning';
+                return; 
+            }
+
+            attemptCount++;
+            statusMessage.textContent = `Yüz tanınıyor... (Deneme ${attemptCount}/${MAX_ATTEMPTS})`;
+            statusMessage.className = 'processing';
+
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageDataUrl = canvas.toDataURL('image/jpeg');
+
+            try {
+                const response = await fetch("{{ url_for('process_payment_with_face') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_data_url: imageDataUrl })
+                });
+                const result = await response.json();
+
+                if (response.ok) {
+                    const score = parseFloat(result.score || 0);
+
+                    if (result.status === 'payment_success') {
+                        const newBalance = parseFloat(result.new_balance || 0);
+                        statusMessage.textContent = `${result.message} Tanınan: ${result.name}, Skor: ${score.toFixed(2)}. Yeni bakiyeniz: ${newBalance.toFixed(2)}. ${REDIRECT_DELAY_MS / 1000} saniye içinde panele yönlendirileceksiniz...`;
+                        statusMessage.className = 'success';
+                        stopCameraStream();
+                        retryButton.style.display = 'none';
+                        // Başarılı ödeme sonrası dashboard'a yönlendir
+                        setTimeout(() => { 
+                            window.location.href = "{{ url_for('dashboard') }}"; 
+                        }, REDIRECT_DELAY_MS);
+                        return; 
+                    } else if (result.status === 'insufficient_balance') {
+                        const currentBalance = parseFloat(result.current_balance || 0);
+                        statusMessage.textContent = `${result.message} Tanınan: ${result.name}, Skor: ${score.toFixed(2)}. Mevcut bakiye: ${currentBalance.toFixed(2)}`;
+                        statusMessage.className = 'warning';
+                        stopCameraStream();
+                        retryButton.style.display = 'inline-block';
+                        return; 
+                    } else if (result.status === 'recognition_failed') {
+                        statusMessage.textContent = `${result.message} Skor: ${score.toFixed(2)}`;
+                    } else if (result.status === 'no_face') {
+                        statusMessage.textContent = result.message;
+                    } else { 
+                         statusMessage.textContent = result.message || 'Tanıma yapılamadı, lütfen pozisyonunuzu kontrol edin.';
+                    }
+                    statusMessage.className = (result.status === 'no_face' || result.status === 'recognition_failed') ? 'warning' : 'error';
+                } else { 
+                    statusMessage.textContent = `Sunucu Hatası: ${result.error || 'Bilinmeyen bir sunucu hatası oluştu.'}`;
+                    statusMessage.className = 'error';
+                }
+            } catch (error) {
+                console.error('Fetch hatası:', error);
+                statusMessage.textContent = 'Sunucuya bağlanırken bir hata oluştu. (Detaylar için konsolu kontrol edin)';
+                statusMessage.className = 'error';
+            }
+
+            if (attemptCount >= MAX_ATTEMPTS) {
+                statusMessage.textContent = `Otomatik tanıma denemeleri tamamlandı. Yüz tanınamadı. Lütfen yeniden deneyin.`;
+                statusMessage.className = 'error';
+                stopCameraStream(); 
+                retryButton.style.display = 'inline-block';
+            }
+        }
+
+        async function startCameraAndRecognition() {
+            attemptCount = 0; 
+            retryButton.style.display = 'none'; 
+            statusMessage.textContent = 'Kamera başlatılıyor ve yüzünüz aranıyor...';
+            statusMessage.className = '';
+
+            try {
+                if (stream) { 
+                    stream.getTracks().forEach(track => track.stop());
+                }
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                video.srcObject = stream;
+                video.style.display = 'block'; 
+                
+                if (recognitionInterval) { 
+                    clearInterval(recognitionInterval);
+                }
+                statusMessage.textContent = 'Kamera aktif. Yüzünüz algılanmaya çalışılıyor...';
+                setTimeout(() => {
+                    if (stream && stream.active) { 
+                        attemptRecognition(); 
+                        recognitionInterval = setInterval(attemptRecognition, ATTEMPT_INTERVAL_MS);
+                    }
+                }, 1500); 
+
+            } catch (err) {
+                console.error("Kamera başlatma hatası: ", err);
+                statusMessage.textContent = 'Kameraya erişilemedi! Lütfen izinleri kontrol edin ve yeniden deneyin.';
+                statusMessage.className = 'error';
+                retryButton.style.display = 'inline-block';
+            }
+        }
+
+        retryButton.addEventListener('click', startCameraAndRecognition);
+        window.addEventListener('load', startCameraAndRecognition);
+        window.addEventListener('beforeunload', () => {
+            stopCameraStream();
+        });
+    </script>
+</body>
+</html>
