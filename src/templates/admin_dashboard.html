@@ -88,6 +88,7 @@
                     <li><a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint == 'admin_dashboard' else '' }}">Ana Sayfa</a></li>
                     <li><a href="{{ url_for('admin_list_users') }}" class="{{ 'active' if 'user' in request.endpoint or request.endpoint == 'admin_list_users' else '' }}">Kullanıcıları Yönet</a></li>
                     <li><a href="{{ url_for('admin_settings') }}" class="{{ 'active' if request.endpoint == 'admin_settings' else '' }}">Sistem Ayarları</a></li>
+                    <li><a href="{{ url_for('admin_list_transactions') }}" class="{{ 'active' if request.endpoint == 'admin_list_transactions' else '' }}">İşlem Logları</a></li>
                 </ul>
             </div>
             <div class="footer-links">

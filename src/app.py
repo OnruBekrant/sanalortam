@@ -7,10 +7,12 @@ import json
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename # Dosya yükleme için
+from werkzeug.utils import secure_filename
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from decimal import Decimal, InvalidOperation
 from functools import wraps
+import datetime
+from sqlalchemy import or_ # E-posta ve kullanıcı ID'sine göre arama için
 
 import cv2
 import numpy as np
@@ -18,22 +20,21 @@ from insightface.app import FaceAnalysis
 from sklearn.metrics.pairwise import cosine_similarity
 
 # Path Tanımlamaları
-basedir = os.path.abspath(os.path.dirname(__file__)) # Bu src klasörünü işaret eder
-PROJECT_ROOT = os.path.dirname(basedir) # Bu ~/projects/sanalortam/ gibi ana proje dizinini işaret eder
+basedir = os.path.abspath(os.path.dirname(__file__))
+PROJECT_ROOT = os.path.dirname(basedir)
 INSTANCE_FOLDER_PATH = os.path.join(PROJECT_ROOT, 'instance')
 USER_PHOTOS_PATH = os.path.join(INSTANCE_FOLDER_PATH, 'user_photos')
-SETTINGS_FILE_PATH = os.path.join(INSTANCE_FOLDER_PATH, 'settings.json') # Ayarlar dosyası yolu
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'} # Yüklenebilecek fotoğraf uzantıları
+SETTINGS_FILE_PATH = os.path.join(INSTANCE_FOLDER_PATH, 'settings.json')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 app = Flask(__name__, instance_path=INSTANCE_FOLDER_PATH)
 
 # --- Ayarları Yükleme ve Kaydetme Fonksiyonları ---
 DEFAULT_SETTINGS = {
-    'FACE_RECOGNITION_FEE': '1.50' # String olarak saklayıp Decimal'e çevireceğiz
+    'FACE_RECOGNITION_FEE': '1.50'
 }
 
 def load_settings():
-    """Ayarları settings.json dosyasından yükler veya varsayılanlarla oluşturur."""
     if not os.path.exists(SETTINGS_FILE_PATH):
         print(f"'{SETTINGS_FILE_PATH}' bulunamadı, varsayılan ayarlarla oluşturuluyor.")
         with open(SETTINGS_FILE_PATH, 'w') as f:
@@ -42,13 +43,12 @@ def load_settings():
     try:
         with open(SETTINGS_FILE_PATH, 'r') as f:
             settings = json.load(f)
-            # Varsayılan ayarlarda eksik anahtar varsa ekle (yeni ayarlar için)
             updated = False
             for key, value in DEFAULT_SETTINGS.items():
                 if key not in settings:
                     settings[key] = value
                     updated = True
-            if updated: # Eğer yeni anahtar eklendiyse dosyayı güncelle
+            if updated:
                  with open(SETTINGS_FILE_PATH, 'w') as f_update:
                     json.dump(settings, f_update, indent=4)
             return settings
@@ -60,48 +60,35 @@ def load_settings():
         return DEFAULT_SETTINGS
 
 def save_settings(settings_data):
-    """Verilen ayarları settings.json dosyasına kaydeder ve app.config'i günceller."""
     try:
         with open(SETTINGS_FILE_PATH, 'w') as f:
             json.dump(settings_data, f, indent=4)
-        
-        # Ayarlar değiştiğinde app.config'i de güncelleyelim (çalışma zamanı için)
-        # Bu, uygulamanın yeniden başlatılmasına gerek kalmadan yeni ayarları kullanmasını sağlar.
-        app_settings_reloaded = load_settings() # Dosyadan en güncel hali tekrar oku
-        
-        # FACE_RECOGNITION_FEE ayarını güncelle
+        app_settings_reloaded = load_settings()
         new_fee_str = app_settings_reloaded.get('FACE_RECOGNITION_FEE', DEFAULT_SETTINGS['FACE_RECOGNITION_FEE'])
         try:
             app.config['FACE_RECOGNITION_FEE'] = Decimal(new_fee_str)
         except InvalidOperation:
             app.config['FACE_RECOGNITION_FEE'] = Decimal(DEFAULT_SETTINGS['FACE_RECOGNITION_FEE'])
             print(f"UYARI: settings.json'daki FACE_RECOGNITION_FEE ('{new_fee_str}') geçersiz, varsayılana dönüldü.")
-
         print("Ayarlar kaydedildi ve app.config güncellendi.")
         return True
     except IOError as e:
         print(f"HATA: Ayarlar dosyası kaydedilemedi: {e}")
         return False
 
-
-# Uygulama Başlangıcında Ayarları Yükle
 app_settings = load_settings()
 
-# Yapılandırmalar
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db' # instance_path belirtildiği için Flask bunu instance klasöründe arar
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = '51614224ab65a418b29e41a41564562fd059d0b27af0e080' # Kendi SECRET_KEY'iniz
+app.config['SECRET_KEY'] = '51614224ab65a418b29e41a41564562fd059d0b27af0e080'
 app.config['USER_FACE_RECOGNITION_THRESHOLD'] = 0.5
-app.config['JSON_AS_ASCII'] = False # Türkçe karakterlerin JSON yanıtlarında doğru görünmesi için
-app.config['UPLOAD_FOLDER'] = USER_PHOTOS_PATH # Yüklenen fotoğrafların kaydedileceği yer
-
-# Yüz tanıma ücretini dosyadan yüklenen ayarlardan al
+app.config['JSON_AS_ASCII'] = False
+app.config['UPLOAD_FOLDER'] = USER_PHOTOS_PATH
 try:
     app.config['FACE_RECOGNITION_FEE'] = Decimal(app_settings.get('FACE_RECOGNITION_FEE', DEFAULT_SETTINGS['FACE_RECOGNITION_FEE']))
 except InvalidOperation:
     print(f"UYARI: Başlangıçtaki FACE_RECOGNITION_FEE ('{app_settings.get('FACE_RECOGNITION_FEE')}') geçersiz, varsayılana dönüldü.")
     app.config['FACE_RECOGNITION_FEE'] = Decimal(DEFAULT_SETTINGS['FACE_RECOGNITION_FEE'])
-
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
@@ -135,6 +122,7 @@ class User(UserMixin, db.Model):
     embedding = db.Column(db.LargeBinary, nullable=True)
     balance = db.Column(db.Numeric(10, 2), nullable=False, default=Decimal('0.00'))
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
+    transactions = db.relationship('Transaction', backref='user', lazy='dynamic', cascade="all, delete-orphan")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -143,12 +131,23 @@ class User(UserMixin, db.Model):
     def __repr__(self):
         return f'<User {self.email}>'
 
+class Transaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True) # index=True eklendi
+    transaction_type = db.Column(db.String(50), nullable=False, index=True) # index=True eklendi
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow, index=True) # index=True eklendi
+    description = db.Column(db.String(255), nullable=True)
+
+    def __repr__(self):
+        return f'<Transaction {self.id} {self.transaction_type} {self.amount} by User {self.user_id}>'
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 def create_json_response(data, status_code=200):
-    json_data = json.dumps(data, ensure_ascii=False, default=str) # Decimal için default=str eklendi
+    json_data = json.dumps(data, ensure_ascii=False, default=str)
     return Response(json_data, status=status_code, content_type='application/json; charset=utf-8')
 
 def admin_required(f):
@@ -171,6 +170,7 @@ def go_to_dashboard_or_login():
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
+# ... (register fonksiyonu aynı) ...
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -221,6 +221,9 @@ def register():
             new_user.set_password(password)
             db.session.add(new_user)
             db.session.commit()
+            initial_balance_transaction = Transaction(user_id=new_user.id, transaction_type='initial_balance', amount=new_user.balance, description="Yeni kullanıcı başlangıç bakiyesi")
+            db.session.add(initial_balance_transaction)
+            db.session.commit()
             flash('Yeni kullanıcı başarıyla oluşturuldu! Hesabınıza 10 birim bakiye eklendi. Şimdi giriş yapabilirsiniz.', 'success')
             return redirect(url_for('login'))
         except Exception as e:
@@ -231,6 +234,7 @@ def register():
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
+# ... (login fonksiyonu aynı) ...
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
@@ -252,6 +256,7 @@ def login():
 
 @app.route('/logout')
 @login_required
+# ... (logout fonksiyonu aynı) ...
 def logout():
     logout_user()
     flash('Başarıyla çıkış yaptınız.', 'success')
@@ -259,6 +264,7 @@ def logout():
 
 @app.route('/dashboard')
 @login_required
+# ... (dashboard fonksiyonu aynı) ...
 def dashboard():
     return render_template('dashboard.html', 
                            user_email=current_user.email, 
@@ -267,16 +273,19 @@ def dashboard():
 
 @app.route('/get_balance', methods=['GET'])
 @login_required
+# ... (get_balance fonksiyonu aynı) ...
 def get_balance():
     return create_json_response({'balance': current_user.balance})
 
 @app.route('/add_balance_page', methods=['GET'])
 @login_required
+# ... (add_balance_page fonksiyonu aynı) ...
 def add_balance_page():
     return render_template('add_balance.html')
 
 @app.route('/process_add_balance', methods=['POST'])
 @login_required
+# ... (process_add_balance fonksiyonu aynı, Transaction logu eklenmişti) ...
 def process_add_balance():
     try:
         amount_str = request.form.get('amount')
@@ -287,7 +296,13 @@ def process_add_balance():
         if amount <= 0:
             flash('Lütfen pozitif bir miktar girin.', 'error')
             return redirect(url_for('add_balance_page'))
+        
         current_user.balance += amount
+        transaction = Transaction(user_id=current_user.id, 
+                                  transaction_type='bakiye_yukleme', 
+                                  amount=amount,
+                                  description=f"{amount} birim bakiye eklendi.")
+        db.session.add(transaction)
         db.session.commit()
         flash(f'{amount} birim başarıyla hesabınıza eklendi. Yeni bakiyeniz: {current_user.balance}', 'success')
         return redirect(url_for('dashboard'))
@@ -302,55 +317,100 @@ def process_add_balance():
 
 @app.route('/make_payment_page', methods=['GET'])
 @login_required
+# ... (make_payment_page fonksiyonu aynı) ...
 def make_payment_page():
     return render_template('make_payment.html', fee=app.config['FACE_RECOGNITION_FEE'])
 
 @app.route('/process_payment_with_face', methods=['POST'])
 @login_required
+# ... (process_payment_with_face fonksiyonu aynı, Transaction logu eklenmişti ve geliştirildi) ...
 def process_payment_with_face():
     if not face_analyzer_app:
         return create_json_response({'error': 'Yüz tanıma servisi aktif değil.', 'status': 'error'}, 503)
+    
     data = request.get_json()
     if not data or 'image_data_url' not in data:
         return create_json_response({'error': 'Resim verisi (image_data_url) eksik.', 'status': 'error'}, 400)
+    
     image_data_url = data['image_data_url']
     if not image_data_url.startswith('data:image/jpeg;base64,'):
         return create_json_response({'error': 'Geçersiz resim formatı.', 'status': 'error'}, 400)
+
+    transaction_description = ""
+    transaction_status_type = "odeme_denemesi" 
+    transaction_amount = Decimal('0.00') 
+
     try:
         base64_image_data = image_data_url.split(',')[1]
         image_data_bytes = base64.b64decode(base64_image_data)
         np_arr = np.frombuffer(image_data_bytes, np.uint8)
         img_frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
         if img_frame is None:
-            return create_json_response({'error': 'Resim verisi çözümlenemedi.', 'status': 'error'}, 400)
+            transaction_description = "Gönderilen resim verisi çözümlenemedi."
+            transaction_status_type = "odeme_hata_resim_cozumlenemedi"
+            db.session.add(Transaction(user_id=current_user.id, transaction_type=transaction_status_type, amount=transaction_amount, description=transaction_description))
+            db.session.commit()
+            return create_json_response({'error': transaction_description, 'status': 'error'}, 400)
+
         rgb_frame = cv2.cvtColor(img_frame, cv2.COLOR_BGR2RGB)
         detected_faces = face_analyzer_app.get(rgb_frame)
+
         if not detected_faces:
-            return create_json_response({'name': 'Unknown', 'score': 0.0, 'message': 'Karede yüz bulunamadı.', 'status': 'no_face'})
+            transaction_description = "Kameradan gönderilen karede yüz bulunamadı."
+            transaction_status_type = "odeme_basarisiz_yuz_yok"
+            db.session.add(Transaction(user_id=current_user.id, transaction_type=transaction_status_type, amount=transaction_amount, description=transaction_description))
+            db.session.commit()
+            return create_json_response({'name': 'Unknown', 'score': 0.0, 'message': transaction_description, 'status': 'no_face'})
+        
         probe_face = detected_faces[0]
         probe_embedding = probe_face.normed_embedding.reshape(1, -1)
         user_to_verify = current_user 
+        
         if not user_to_verify.embedding:
-            return create_json_response({'name': 'Unknown', 'score': 0.0, 'message': 'Kullanıcının kayıtlı yüz özelliği bulunamadı.', 'status': 'no_embedding'})
+            transaction_description = "Kullanıcının kayıtlı yüz özelliği (embedding) bulunamadı."
+            transaction_status_type = "odeme_basarisiz_kayitli_embedding_yok"
+            db.session.add(Transaction(user_id=current_user.id, transaction_type=transaction_status_type, amount=transaction_amount, description=transaction_description))
+            db.session.commit()
+            return create_json_response({'name': 'Unknown', 'score': 0.0, 'message': transaction_description, 'status': 'no_embedding'})
+
         retrieved_embedding = np.frombuffer(user_to_verify.embedding, dtype=np.float32).reshape(1, -1)
         similarity = cosine_similarity(probe_embedding, retrieved_embedding)[0][0]
         threshold = app.config.get('USER_FACE_RECOGNITION_THRESHOLD', 0.5)
-        fee = app.config.get('FACE_RECOGNITION_FEE', Decimal('0.00')) # Dosyadan yüklenen config değeri
-        if similarity >= threshold:
+        fee = app.config.get('FACE_RECOGNITION_FEE', Decimal('0.00'))
+
+        if similarity >= threshold: 
             if user_to_verify.balance >= fee:
                 user_to_verify.balance -= fee
+                transaction_status_type = 'odeme_basarili'
+                transaction_amount = -fee
+                transaction_description = f"Yüz tanıma ile {fee} birim ödeme yapıldı. Benzerlik: {similarity:.4f}"
+                db.session.add(Transaction(user_id=user_to_verify.id, transaction_type=transaction_status_type, amount=transaction_amount, description=transaction_description))
                 db.session.commit()
                 return create_json_response({'name': user_to_verify.email, 'score': float(similarity), 'message': f'Ödeme başarılı! {fee} birim düşüldü.','new_balance': user_to_verify.balance,'status': 'payment_success'})
-            else:
+            else: 
+                transaction_status_type = 'odeme_basarisiz_bakiye_yetersiz'
+                transaction_description = f"Yüz tanındı (Benzerlik: {similarity:.4f}) ancak bakiye yetersiz ({user_to_verify.balance}) olduğu için {fee} birim ödeme yapılamadı."
+                db.session.add(Transaction(user_id=user_to_verify.id, transaction_type=transaction_status_type, amount=transaction_amount, description=transaction_description))
+                db.session.commit()
                 return create_json_response({'name': user_to_verify.email, 'score': float(similarity), 'message': 'Yüz tanındı ancak bakiye yetersiz.','current_balance': user_to_verify.balance,'status': 'insufficient_balance'})
-        else:
+        else: 
+            transaction_status_type = 'odeme_basarisiz_eslesmedi'
+            transaction_description = f"Yüz tanınamadı (kullanıcıyla eşleşmedi). Benzerlik: {similarity:.4f}, Eşik: {threshold}"
+            db.session.add(Transaction(user_id=current_user.id, transaction_type=transaction_status_type, amount=transaction_amount, description=transaction_description))
+            db.session.commit()
             return create_json_response({'name': 'Unknown', 'score': float(similarity), 'message': 'Yüz tanınamadı (kullanıcıyla eşleşmedi).','status': 'recognition_failed'})
+
     except Exception as e:
+        db.session.rollback() 
         app.logger.error(f"Yüz tanıma ile ödeme hatası: {e}", exc_info=True)
-        return create_json_response({'error': f'Tanıma sırasında bir hata oluştu: {str(e)}', 'status': 'error'}, 500)
+        db.session.add(Transaction(user_id=current_user.id, transaction_type='odeme_hata_sunucu', amount=Decimal('0.00'), description=f"Ödeme sırasında sunucu hatası: {str(e)[:200]}"))
+        db.session.commit()
+        return create_json_response({'error': f'Ödeme sırasında bir hata oluştu: {str(e)}', 'status': 'error'}, 500)
 
 @app.route('/test_turkce_json')
 def test_turkce_json():
+    # ... (test_turkce_json fonksiyonu aynı) ...
     print(f"DEBUG: test_turkce_json içinde JSON_AS_ASCII ayarı (config'den): {app.config.get('JSON_AS_ASCII')}")
     data = {"mesaj": "Başarı! Şemsi Paşa pasajında sesi büzüşesiceler."}
     return create_json_response(data)
@@ -366,6 +426,7 @@ def admin_dashboard():
 @login_required
 @admin_required
 def admin_list_users():
+    # ... (admin_list_users fonksiyonu aynı) ...
     page = request.args.get('page', 1, type=int)
     per_page = 10 
     search_query = request.args.get('q', '')
@@ -383,6 +444,7 @@ def admin_list_users():
 @login_required
 @admin_required
 def admin_edit_user(user_id):
+    # ... (admin_edit_user fonksiyonu aynı) ...
     user_to_edit = db.session.get(User, user_id)
     if not user_to_edit:
         flash('Kullanıcı bulunamadı.', 'danger')
@@ -465,6 +527,7 @@ def serve_user_photo(filename):
 @login_required
 @admin_required
 def admin_delete_user(user_id):
+    # ... (admin_delete_user fonksiyonu aynı) ...
     user_to_delete = db.session.get(User, user_id)
     if not user_to_delete:
         flash('Silinecek kullanıcı bulunamadı.', 'danger')
@@ -491,7 +554,8 @@ def admin_delete_user(user_id):
 @login_required
 @admin_required
 def admin_settings():
-    current_settings = load_settings()
+    # ... (admin_settings fonksiyonu aynı) ...
+    current_settings = load_settings() 
     if request.method == 'POST':
         new_fee_str = request.form.get('face_recognition_fee')
         try:
@@ -499,7 +563,7 @@ def admin_settings():
             if new_fee < 0:
                 flash("Ücret negatif olamaz.", "danger")
             else:
-                current_settings['FACE_RECOGNITION_FEE'] = str(new_fee)
+                current_settings['FACE_RECOGNITION_FEE'] = str(new_fee) 
                 if save_settings(current_settings):
                     flash("Ayarlar başarıyla güncellendi.", "success")
                 else:
@@ -512,6 +576,55 @@ def admin_settings():
                            page_title="Sistem Ayarları", 
                            current_fee=current_fee_from_config)
 
+@app.route('/admin/transactions', methods=['GET']) # methods=['GET'] eklendi
+@login_required
+@admin_required
+def admin_list_transactions():
+    page = request.args.get('page', 1, type=int)
+    per_page = 15
+    
+    # Filtreleme parametrelerini al
+    search_email = request.args.get('search_email', '').strip()
+    transaction_type_filter = request.args.get('transaction_type', '').strip()
+    start_date_str = request.args.get('start_date', '').strip()
+    end_date_str = request.args.get('end_date', '').strip()
+
+    query = Transaction.query.join(User, Transaction.user_id == User.id) # User tablosuyla join yap
+
+    if search_email:
+        query = query.filter(User.email.ilike(f'%{search_email}%'))
+    
+    if transaction_type_filter:
+        query = query.filter(Transaction.transaction_type == transaction_type_filter)
+    
+    if start_date_str:
+        try:
+            start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d')
+            query = query.filter(Transaction.timestamp >= start_date)
+        except ValueError:
+            flash("Geçersiz başlangıç tarihi formatı. Lütfen YYYY-MM-DD kullanın.", "warning")
+            
+    if end_date_str:
+        try:
+            end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d')
+            # Bitiş tarihini gün sonu olarak almak için (o günkü işlemleri de dahil etmek için)
+            end_date = end_date.replace(hour=23, minute=59, second=59)
+            query = query.filter(Transaction.timestamp <= end_date)
+        except ValueError:
+            flash("Geçersiz bitiş tarihi formatı. Lütfen YYYY-MM-DD kullanın.", "warning")
+
+    all_transactions_pagination = query.order_by(Transaction.timestamp.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    
+    return render_template('admin_transactions.html', 
+                           transactions=all_transactions_pagination.items, 
+                           pagination=all_transactions_pagination, 
+                           page_title="İşlem Logları",
+                           # Filtre değerlerini şablona geri gönder
+                           search_email=search_email,
+                           transaction_type=transaction_type_filter,
+                           start_date=start_date_str,
+                           end_date=end_date_str)
+
 if __name__ == '__main__':
     if not os.path.exists(INSTANCE_FOLDER_PATH):
         os.makedirs(INSTANCE_FOLDER_PATH)
@@ -519,6 +632,7 @@ if __name__ == '__main__':
         os.makedirs(USER_PHOTOS_PATH)
         print(f"'{USER_PHOTOS_PATH}' klasörü oluşturuldu.")
     if not os.path.exists(SETTINGS_FILE_PATH):
-        load_settings() # Bu, dosya yoksa varsayılanlarla oluşturur.
+        load_settings() 
         print(f"'{SETTINGS_FILE_PATH}' oluşturuldu ve varsayılan ayarlar yüklendi.")
+
     app.run(debug=True, host='0.0.0.0')

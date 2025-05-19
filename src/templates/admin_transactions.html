@@ -66,17 +66,58 @@
             border-bottom: 1px solid #dee2e6;
             padding-bottom: 15px;
         }
-        .search-form { margin-bottom: 25px; display: flex; gap: 10px; align-items: center; }
-        .search-form input[type="text"] { flex-grow: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 1em; }
-        .search-form button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; height: 40px; }
-        .search-form button:hover { background-color: #0056b3; }
-        .search-form a { 
+        .filter-form { 
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 25px; 
+            display: flex; 
+            gap: 15px; 
+            align-items: flex-end; /* Buton ve inputları hizalamak için */
+            flex-wrap: wrap; /* Küçük ekranlarda alt satıra geçmesi için */
+        }
+        .filter-form .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex-grow: 1; /* Alanların genişlemesi için */
+            min-width: 180px; /* Minimum genişlik */
+        }
+        .filter-form label { font-weight: 600; font-size: 0.9em; color: #495057; }
+        .filter-form input[type="text"],
+        .filter-form input[type="date"],
+        .filter-form select { 
+            padding: 10px; 
+            border: 1px solid #ced4da; 
+            border-radius: 4px; 
+            font-size: 0.95em; 
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .filter-form button { 
+            padding: 10px 20px; 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 1em; 
+            height: 40px; /* Inputlarla aynı yükseklik */
+            align-self: flex-end; /* Dikey hizalama */
+        }
+        .filter-form button:hover { background-color: #0056b3; }
+        .filter-form .clear-filter-link {
             margin-left: 10px;
             color: #6c757d;
             text-decoration: none;
             font-size: 0.9em;
+            height: 40px;
+            display: inline-flex; /* Dikey hizalama için */
+            align-items: center; /* Dikey hizalama için */
         }
-        .search-form a:hover { text-decoration: underline;}
+        .filter-form .clear-filter-link:hover { text-decoration: underline; }
+
 
         table { 
             width: 100%; 
@@ -106,25 +147,6 @@
         tr:hover { background-color: #f1f3f5; } 
         td:first-child, th:first-child { padding-left: 20px; } 
         td:last-child, th:last-child { padding-right: 20px; } 
-
-        .action-links a, .action-links button { 
-            margin-right: 12px; 
-            text-decoration: none; 
-            font-weight: 500;
-            padding: 5px 8px; 
-            border-radius: 4px; 
-            font-size: 0.9em; 
-            cursor: pointer;
-            vertical-align: middle; 
-        }
-        .action-links a { color: #007bff; border: 1px solid transparent; }
-        .action-links button.delete-btn { 
-            color: #fff; 
-            background-color: #dc3545;
-            border: 1px solid #dc3545;
-        }
-        .action-links button.delete-btn:hover { background-color: #c82333; border-color: #bd2130;}
-        .action-links a:hover { text-decoration: underline; }
 
         .pagination { margin-top: 30px; text-align: center; }
         .pagination a, .pagination span {
@@ -160,7 +182,7 @@
                 <h3>Admin Paneli</h3>
                 <ul>
                     <li><a href="{{ url_for('admin_dashboard') }}" class="{{ 'active' if request.endpoint == 'admin_dashboard' else '' }}">Ana Sayfa</a></li>
-                    <li><a href="{{ url_for('admin_list_users') }}" class="{{ 'active' if 'user' in request.endpoint or request.endpoint == 'admin_list_users' else '' }}">Kullanıcıları Yönet</a></li>
+                    <li><a href="{{ url_for('admin_list_users') }}" class="{{ 'active' if request.endpoint == 'admin_list_users' or request.endpoint == 'admin_edit_user' else '' }}">Kullanıcıları Yönet</a></li>
                     <li><a href="{{ url_for('admin_settings') }}" class="{{ 'active' if request.endpoint == 'admin_settings' else '' }}">Sistem Ayarları</a></li>
                     <li><a href="{{ url_for('admin_list_transactions') }}" class="{{ 'active' if request.endpoint == 'admin_list_transactions' else '' }}">İşlem Logları</a></li>
                 </ul>
@@ -184,66 +206,72 @@
                 {% endif %}
             {% endwith %}
 
-            <form method="GET" action="{{ url_for('admin_list_users') }}" class="search-form">
-                <input type="text" name="q" placeholder="E-posta ile ara..." value="{{ search_query or '' }}">
-                <button type="submit">Ara</button>
-                {% if search_query %}
-                    <a href="{{ url_for('admin_list_users') }}">Aramayı Temizle</a>
-                {% endif %}
+            {# FİLTRELEME FORMU EKLENDİ #}
+            <form method="GET" action="{{ url_for('admin_list_transactions') }}" class="filter-form">
+                <div class="form-group">
+                    <label for="search_email">Kullanıcı E-postası:</label>
+                    <input type="text" id="search_email" name="search_email" value="{{ request.args.get('search_email', '') }}" placeholder="E-posta girin...">
+                </div>
+                <div class="form-group">
+                    <label for="transaction_type">İşlem Türü:</label>
+                    <select id="transaction_type" name="transaction_type">
+                        <option value="" {% if not request.args.get('transaction_type') %}selected{% endif %}>Tümü</option>
+                        <option value="initial_balance" {% if request.args.get('transaction_type') == 'initial_balance' %}selected{% endif %}>Başlangıç Bakiyesi</option>
+                        <option value="bakiye_yukleme" {% if request.args.get('transaction_type') == 'bakiye_yukleme' %}selected{% endif %}>Bakiye Yükleme</option>
+                        <option value="odeme_basarili" {% if request.args.get('transaction_type') == 'odeme_basarili' %}selected{% endif %}>Başarılı Ödeme</option>
+                        <option value="odeme_basarisiz_yuz_yok" {% if request.args.get('transaction_type') == 'odeme_basarisiz_yuz_yok' %}selected{% endif %}>Başarısız (Yüz Yok)</option>
+                        <option value="odeme_basarisiz_kayitli_embedding_yok" {% if request.args.get('transaction_type') == 'odeme_basarisiz_kayitli_embedding_yok' %}selected{% endif %}>Başarısız (Kayıtlı Embedding Yok)</option>
+                        <option value="odeme_basarisiz_bakiye_yetersiz" {% if request.args.get('transaction_type') == 'odeme_basarisiz_bakiye_yetersiz' %}selected{% endif %}>Başarısız (Bakiye Yetersiz)</option>
+                        <option value="odeme_basarisiz_eslesmedi" {% if request.args.get('transaction_type') == 'odeme_basarisiz_eslesmedi' %}selected{% endif %}>Başarısız (Eşleşmedi)</option>
+                        <option value="odeme_hata_sunucu" {% if request.args.get('transaction_type') == 'odeme_hata_sunucu' %}selected{% endif %}>Başarısız (Sunucu Hatası)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="start_date">Başlangıç Tarihi:</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ request.args.get('start_date', '') }}">
+                </div>
+                <div class="form-group">
+                    <label for="end_date">Bitiş Tarihi:</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ request.args.get('end_date', '') }}">
+                </div>
+                <button type="submit">Filtrele</button>
+                <a href="{{ url_for('admin_list_transactions') }}" class="clear-filter-link">Filtreyi Temizle</a>
             </form>
 
             <table>
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>E-posta</th>
-                        <th>Bakiye</th>
-                        <th>Admin mi?</th>
-                        <th>Fotoğraf</th>
-                        <th>Embedding?</th>
-                        <th>İşlemler</th>
+                        <th>Kullanıcı E-postası</th>
+                        <th>İşlem Türü</th>
+                        <th>Miktar</th>
+                        <th>Açıklama</th>
+                        <th>Zaman Damgası</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for user_item in users %}
+                    {% for transaction in transactions %}
                     <tr>
-                        <td>{{ user_item.id }}</td>
-                        <td>{{ user_item.email }}</td>
-                        <td>{{ "%.2f"|format(user_item.balance) }}</td>
-                        <td>{% if user_item.is_admin %}Evet{% else %}Hayır{% endif %}</td>
-                        <td>
-                            {% if user_item.photo_filename %}
-                                <img src="{{ url_for('serve_user_photo', filename=user_item.photo_filename) }}" alt="Foto" style="width: 50px; height: auto; border-radius: 4px;">
-                            {% else %}
-                                -
-                            {% endif %}
-                        </td>
-                        <td>{% if user_item.embedding %}Var{% else %}Yok{% endif %}</td>
-                        <td class="action-links">
-                            <a href="{{ url_for('admin_edit_user', user_id=user_item.id) }}">Düzenle</a> 
-                            <form method="POST" action="{{ url_for('admin_delete_user', user_id=user_item.id) }}" style="display: inline;" onsubmit="return confirm('Bu kullanıcıyı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.');">
-                                <button type="submit" class="delete-btn">Sil</button>
-                            </form>
-                        </td>
+                        <td>{{ transaction.id }}</td>
+                        <td>{{ transaction.user.email if transaction.user else 'Bilinmeyen Kullanıcı' }}</td>
+                        <td>{{ transaction.transaction_type }}</td>
+                        <td>{{ "%.2f"|format(transaction.amount) }}</td>
+                        <td>{{ transaction.description if transaction.description else '-' }}</td>
+                        <td>{{ transaction.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" style="text-align:center; padding: 20px;">
-                            {% if search_query %}
-                                '{{ search_query }}' için sonuç bulunamadı.
-                            {% else %}
-                                Kayıtlı kullanıcı bulunamadı.
-                            {% endif %}
-                        </td>
+                        <td colspan="6" style="text-align:center; padding: 20px;">Filtreye uygun işlem bulunamadı veya hiç işlem yapılmamış.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
 
+            {# Sayfalama Linkleri #}
             {% if pagination %}
             <div class="pagination">
                 {% if pagination.has_prev %}
-                    <a href="{{ url_for(request.endpoint, page=pagination.prev_num, q=search_query or '') }}">&laquo; Önceki</a>
+                    <a href="{{ url_for(request.endpoint, page=pagination.prev_num, search_email=request.args.get('search_email', ''), transaction_type=request.args.get('transaction_type', ''), start_date=request.args.get('start_date', ''), end_date=request.args.get('end_date', '')) }}">&laquo; Önceki</a>
                 {% else %}
                     <span class="disabled">&laquo; Önceki</span>
                 {% endif %}
@@ -252,19 +280,20 @@
                         {% if pagination.page == page_num %}
                             <span class="current">{{ page_num }}</span>
                         {% else %}
-                            <a href="{{ url_for(request.endpoint, page=page_num, q=search_query or '') }}">{{ page_num }}</a>
+                            <a href="{{ url_for(request.endpoint, page=page_num, search_email=request.args.get('search_email', ''), transaction_type=request.args.get('transaction_type', ''), start_date=request.args.get('start_date', ''), end_date=request.args.get('end_date', '')) }}">{{ page_num }}</a>
                         {% endif %}
                     {% else %}
                         <span class="disabled">...</span>
                     {% endif %}
                 {% endfor %}
                 {% if pagination.has_next %}
-                    <a href="{{ url_for(request.endpoint, page=pagination.next_num, q=search_query or '') }}">Sonraki &raquo;</a>
+                    <a href="{{ url_for(request.endpoint, page=pagination.next_num, search_email=request.args.get('search_email', ''), transaction_type=request.args.get('transaction_type', ''), start_date=request.args.get('start_date', ''), end_date=request.args.get('end_date', '')) }}">Sonraki &raquo;</a>
                 {% else %}
                     <span class="disabled">Sonraki &raquo;</span>
                 {% endif %}
             </div>
             {% endif %}
+
         </main>
     </div>
 </body>
